@@ -10,20 +10,20 @@ module Packwerk
     sig { returns(Reference) }
     attr_reader :reference
 
-    sig { returns(ViolationType) }
+    sig { returns(String) }
     attr_reader :violation_type
 
     sig do
       params(
         reference: Packwerk::Reference,
-        violation_type: Packwerk::ViolationType,
+        violation_type: String,
         message: String,
         location: T.nilable(Node::Location)
       )
         .void
     end
     def initialize(reference:, violation_type:, message:, location: nil)
-      super(file: reference.relative_path, message: message, location: location)
+      super(file: T.must(reference.relative_path), message: message, location: location)
       @reference = reference
       @violation_type = violation_type
     end

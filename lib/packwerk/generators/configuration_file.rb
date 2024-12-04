@@ -1,4 +1,4 @@
-# typed: true
+# typed: strict
 # frozen_string_literal: true
 
 require "erb"
@@ -11,6 +11,9 @@ module Packwerk
       CONFIGURATION_TEMPLATE_FILE_PATH = "templates/packwerk.yml.erb"
 
       class << self
+        extend T::Sig
+
+        sig { params(root: String, out: T.any(IO, StringIO)).returns(T::Boolean) }
         def generate(root:, out:)
           new(root: root, out: out).generate
         end
@@ -25,7 +28,7 @@ module Packwerk
       sig { returns(T::Boolean) }
       def generate
         @out.puts("📦 Generating Packwerk configuration file...")
-        default_config_path = File.join(@root, ::Packwerk::Configuration::DEFAULT_CONFIG_PATH)
+        default_config_path = File.join(@root, Configuration::DEFAULT_CONFIG_PATH)
 
         if File.exist?(default_config_path)
           @out.puts("⚠️  Packwerk configuration file already exists.")
@@ -40,10 +43,12 @@ module Packwerk
 
       private
 
+      sig { returns(String) }
       def render
         ERB.new(template, trim_mode: "-").result(binding)
       end
 
+      sig { returns(String) }
       def template
         template_file_path = File.join(__dir__, CONFIGURATION_TEMPLATE_FILE_PATH)
         File.read(template_file_path)

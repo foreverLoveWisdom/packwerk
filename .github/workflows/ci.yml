@@ -1,59 +1,88 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+      - '*-stable'
+  pull_request:
 
 jobs:
-  build:
+  tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         gemfile:
           - Gemfile
-          - gemfiles/Gemfile-rails-6-0
         ruby:
-          - 2.6
-          - 2.7
-          - 3.0
-        exclude:
-          - ruby: 2.6
-            gemfile: Gemfile
+          - "3.1"
+          - "3.2"
+          - "3.3"
     env:
       BUNDLE_GEMFILE: ${{ matrix.gemfile }}
     name: "Tests: Ruby ${{ matrix.ruby }} ${{ matrix.gemfile }}"
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
+      - name: Deletes Gemfile.lock
+        run: rm Gemfile.lock
       - name: Set up Ruby ${{ matrix.ruby }}
-        uses: actions/setup-ruby@v1
+        uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
       - name: Run tests
-        run: |
-          gem install bundler
-          bundle install --jobs 4 --retry 3
-          bin/rake
+        run: bin/rake test
+  loading-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        gemfile:
+          - Gemfile
+        ruby:
+          - "3.1"
+          - "3.2"
+    env:
+      BUNDLE_GEMFILE: ${{ matrix.gemfile }}
+    name: "Loading Tests: Ruby ${{ matrix.ruby }} ${{ matrix.gemfile }}"
+    steps:
+      - uses: actions/checkout@v2
+      - name: Delete Gemfile.lock
+        run: rm Gemfile.lock
+      - name: Set up Ruby ${{ matrix.ruby }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+      - name: Run tests
+        run: bin/rake test:loading
   lint:
     runs-on: ubuntu-latest
+    name: Lint
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: Set up Ruby
-        uses: actions/setup-ruby@v1
+        uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.0.x
+          bundler-cache: true
       - name: Run style checks
-        run: |
-          gem install bundler
-          bundle install --jobs 4 --retry 3
-          bin/rubocop
-  static-type-checking:
+        run: bin/rubocop
+  static_type_checking:
     runs-on: ubuntu-latest
+    name: Type Checking
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: Set up Ruby
-        uses: actions/setup-ruby@v1
+        uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.0.x
+          bundler-cache: true
       - name: Run static type checks
-        run: |
-          gem install bundler
-          bundle install --jobs 4 --retry 3
-          bin/srb tc
+        run: bin/srb tc
+  buildall:
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    name: Build (matrix)
+    needs: [lint, tests, static_type_checking]
+    steps:
+      - name: Check build matrix status
+        if: ${{ needs.tests.result != 'success' || needs.lint.result != 'success' || needs.static_type_checking.result != 'success' }}
+        run: exit 1

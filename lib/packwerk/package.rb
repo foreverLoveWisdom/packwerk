@@ -17,22 +17,20 @@ module Packwerk
     sig { returns(T::Array[String]) }
     attr_reader :dependencies
 
-    sig { params(name: String, config: T.nilable(T.any(T::Hash[T.untyped, T.untyped], FalseClass))).void }
-    def initialize(name:, config:)
+    sig { returns(T::Hash[T.untyped, T.untyped]) }
+    attr_reader :config
+
+    sig { params(name: String, config: T.nilable(T::Hash[String, T.untyped])).void }
+    def initialize(name:, config: nil)
       @name = name
-      @config = T.let(config || {}, T::Hash[T.untyped, T.untyped])
+      @config = T.let(config || {}, T::Hash[String, T.untyped])
       @dependencies = T.let(Array(@config["dependencies"]).freeze, T::Array[String])
       @public_path = T.let(nil, T.nilable(String))
     end
 
-    sig { returns(T.nilable(T.any(T::Boolean, T::Array[String]))) }
-    def enforce_privacy
-      @config["enforce_privacy"]
-    end
-
     sig { returns(T::Boolean) }
     def enforce_dependencies?
-      @config["enforce_dependencies"] == true
+      [true, "strict"].include?(@config["enforce_dependencies"])
     end
 
     sig { params(package: Package).returns(T::Boolean) }
@@ -44,33 +42,7 @@ module Packwerk
     def package_path?(path)
       return true if root?
 
-      path.start_with?(@name)
-    end
-
-    sig { returns(String) }
-    def public_path
-      @public_path ||= begin
-        unprefixed_public_path = user_defined_public_path || "app/public/"
-
-        if root?
-          unprefixed_public_path
-        else
-          File.join(@name, unprefixed_public_path)
-        end
-      end
-    end
-
-    sig { params(path: String).returns(T::Boolean) }
-    def public_path?(path)
-      path.start_with?(public_path)
-    end
-
-    sig { returns(T.nilable(String)) }
-    def user_defined_public_path
-      return unless @config["public_path"]
-      return @config["public_path"] if @config["public_path"].end_with?("/")
-
-      @config["public_path"] + "/"
+      path.start_with?(@name + "/")
     end
 
     sig { params(other: T.untyped).returns(T.nilable(Integer)) }

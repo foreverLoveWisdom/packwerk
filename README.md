@@ -1,10 +1,5 @@
 # Packwerk [![Build Status](https://github.com/Shopify/packwerk/workflows/CI/badge.svg)](https://github.com/Shopify/packwerk/actions?query=workflow%3ACI)
 
-### ⚠️ While Shopify is actively using `packwerk`, we consider it feature complete.
-We are keeping `packwerk` compatible with current versions of Ruby and Rails, but will accept feature requests only in rare cases. Please submit bug fixes though!
-
----
-
 > "I know who you are and because of that I know what you do."
 > This knowledge is a dependency that raises the cost of change.
 
@@ -15,14 +10,13 @@ Packwerk is a Ruby gem used to enforce boundaries and modularize Rails applicati
 Packwerk can be used to:
 * Combine groups of files into packages
 * Define package-level constant visibility (i.e. have publicly accessible constants)
-* Enforce privacy (inbound) and dependency (outbound) boundaries between packages
 * Help existing codebases to become more modular without obstructing development
 
 ## Prerequisites
 
 Packwerk needs [Zeitwerk](https://github.com/fxn/zeitwerk) enabled, which comes with Rails 6.
 
-Packwerk supports MRI versions 2.6 and above.
+Packwerk supports MRI versions 2.7 and above.
 
 ## Demo
 
@@ -64,9 +58,12 @@ Read [USAGE.md](USAGE.md) for usage once Packwerk is installed on your project.
 Various third parties have built tooling on top of packwerk. Here's a selection of some that might prove useful:
 
 - https://github.com/bellroy/graphwerk draws a graph of your package dependencies
-- https://github.com/Gusto/packwerk-vscode integrates packwerk into Visual Studio Code so you can see violations right in your editor
-- https://github.com/Gusto/stimpack sets up Rails autoloading, as well as `rspec` and `FactoryBot` integration, for packages arranged in a flat list. Stimpack is quite convenient, but for autoloading we recommend to use `Rails::Engine`s instead.
-- https://github.com/BigRails/danger-packwerk integrates packwerk with [danger.systems](https://danger.systems) to provide packwerk feedback as Github inline PR comments
+- https://github.com/rubyatscale/packwerk-vscode integrates packwerk into Visual Studio Code so you can see violations right in your editor
+- https://github.com/vinted/packwerk-intellij integrates packwerk into RubyMine so you can see violations right in your editor
+- https://github.com/rubyatscale/packs-rails sets up Rails autoloading, as well as `rspec` and `FactoryBot` integration, for packages arranged in a flat list. packs-rails is quite convenient, but for autoloading we recommend to use `Rails::Engine`s instead.
+- https://github.com/rubyatscale/danger-packwerk integrates packwerk with [danger.systems](https://danger.systems) to provide packwerk feedback as Github inline PR comments
+- https://github.com/rubyatscale/packwerk-extensions contains extensions for packwerk, including a checker for packwerk that allows you to enforce public API boundaries. This was originally extracted from `packwerk` itself.
+- https://github.com/alexevanczuk/packs is a Rust implementation of packwerk that has experimental support for non-Rails, non-Zeitwerk applications.
 
 ## Development
 

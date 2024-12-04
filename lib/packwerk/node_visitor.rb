@@ -1,4 +1,4 @@
-# typed: true
+# typed: strict
 # frozen_string_literal: true
 
 module Packwerk
@@ -11,14 +11,23 @@ module Packwerk
       @node_processor = node_processor
     end
 
+    sig do
+      params(
+        node: Parser::AST::Node,
+        ancestors: T::Array[Parser::AST::Node],
+        result: T::Array[UnresolvedReference],
+      ).void
+    end
     def visit(node, ancestors:, result:)
       reference = @node_processor.call(node, ancestors)
       result << reference if reference
 
       child_ancestors = [node] + ancestors
-      Node.each_child(node) do |child|
+      NodeHelpers.each_child(node) do |child|
         visit(child, ancestors: child_ancestors, result: result)
       end
     end
   end
+
+  private_constant :NodeVisitor
 end

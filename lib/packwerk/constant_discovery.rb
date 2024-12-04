@@ -1,4 +1,4 @@
-# typed: true
+# typed: strict
 # frozen_string_literal: true
 
 require "constant_resolver"
@@ -16,8 +16,6 @@ module Packwerk
   #   constant with the same name exists in the inheriting class, and this view is sufficient for all our use cases.
   class ConstantDiscovery
     extend T::Sig
-
-    ConstantContext = Struct.new(:name, :location, :package, :public?)
 
     # @param constant_resolver [ConstantResolver]
     # @param packages [Packwerk::PackageSet]
@@ -50,12 +48,12 @@ module Packwerk
     # @param const_name [String] The unresolved constant's name.
     # @param current_namespace_path [Array<String>] (optional) The namespace of the context in which the constant is
     #   used, e.g. ["Apps", "Models"] for `Apps::Models`. Defaults to [] which means top level.
-    # @return [Packwerk::ConstantDiscovery::ConstantContext]
+    # @return [ConstantContext]
     sig do
       params(
         const_name: String,
         current_namespace_path: T.nilable(T::Array[String]),
-      ).returns(T.nilable(ConstantDiscovery::ConstantContext))
+      ).returns(T.nilable(ConstantContext))
     end
     def context_for(const_name, current_namespace_path: [])
       begin
@@ -71,8 +69,9 @@ module Packwerk
         constant.name,
         constant.location,
         package,
-        package.public_path?(constant.location),
       )
     end
   end
+
+  private_constant :ConstantDiscovery
 end

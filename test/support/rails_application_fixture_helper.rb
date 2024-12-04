@@ -1,11 +1,11 @@
 # typed: true
 # frozen_string_literal: true
 
-require "rails_test_helper"
+require "support/rails_test_helper"
 require "zeitwerk"
 
 module RailsApplicationFixtureHelper
-  include ApplicationFixtureHelper
+  include Packwerk::ApplicationFixtureHelper
 
   class Autoloaders
     include Enumerable

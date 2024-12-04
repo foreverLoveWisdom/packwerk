@@ -1,4 +1,4 @@
-# typed: true
+# typed: strict
 # frozen_string_literal: true
 
 require "pathname"
@@ -6,7 +6,12 @@ require "yaml"
 
 module Packwerk
   class Configuration
+    extend T::Sig
+
     class << self
+      extend T::Sig
+
+      sig { params(path: String).returns(Configuration) }
       def from_path(path = Dir.pwd)
         raise ArgumentError, "#{File.expand_path(path)} does not exist" unless File.exist?(path)
 
@@ -21,6 +26,7 @@ module Packwerk
 
       private
 
+      sig { params(path: String).returns(Configuration) }
       def from_packwerk_config(path)
         new(
           YAML.load_file(path) || {},
@@ -30,63 +36,85 @@ module Packwerk
     end
 
     DEFAULT_CONFIG_PATH = "packwerk.yml"
-    DEFAULT_INCLUDE_GLOBS = ["**/*.{rb,rake,erb}"]
-    DEFAULT_EXCLUDE_GLOBS = ["{bin,node_modules,script,tmp,vendor}/**/*"]
+    DEFAULT_INCLUDE_GLOBS = T.let(["**/*.{rb,rake,erb}"], T::Array[String])
+    DEFAULT_EXCLUDE_GLOBS = T.let(["{bin,node_modules,script,tmp,vendor}/**/*"], T::Array[String])
 
-    attr_reader(
-      :include, :exclude, :root_path, :package_paths, :custom_associations, :config_path, :cache_directory
-    )
+    sig { returns(T::Array[String]) }
+    attr_reader(:include)
 
+    sig { returns(T::Array[String]) }
+    attr_reader(:exclude)
+
+    sig { returns(String) }
+    attr_reader(:root_path)
+
+    sig { returns(T.any(String, T::Array[String])) }
+    attr_reader(:package_paths)
+
+    sig { returns(T::Array[Symbol]) }
+    attr_reader(:custom_associations)
+
+    sig { returns(T::Array[String]) }
+    attr_reader(:associations_exclude)
+
+    sig { returns(T.nilable(String)) }
+    attr_reader(:config_path)
+
+    sig { returns(Pathname) }
+    attr_reader(:cache_directory)
+
+    sig { params(parallel: T::Boolean).returns(T::Boolean) }
+    attr_writer(:parallel)
+
+    sig do
+      params(
+        configs: T::Hash[String, T.untyped],
+        config_path: T.nilable(String),
+      ).void
+    end
     def initialize(configs = {}, config_path: nil)
-      @include = configs["include"] || DEFAULT_INCLUDE_GLOBS
-      @exclude = configs["exclude"] || DEFAULT_EXCLUDE_GLOBS
+      @include = T.let(configs["include"] || DEFAULT_INCLUDE_GLOBS, T::Array[String])
+      @exclude = T.let(configs["exclude"] || DEFAULT_EXCLUDE_GLOBS, T::Array[String])
       root = config_path ? File.dirname(config_path) : "."
-      @root_path = File.expand_path(root)
-      @package_paths = configs["package_paths"] || "**/"
-      @custom_associations = configs["custom_associations"] || []
-      @parallel = configs.key?("parallel") ? configs["parallel"] : true
-      @cache_enabled = configs.key?("cache") ? configs["cache"] : false
-      @cache_directory = Pathname.new(configs["cache_directory"] || "tmp/cache/packwerk")
+      @root_path = T.let(File.expand_path(root), String)
+      @package_paths = T.let(configs["package_paths"] || "**/", T.any(String, T::Array[String]))
+      @custom_associations = T.let((configs["custom_associations"] || []).map(&:to_sym), T::Array[Symbol])
+      @associations_exclude = T.let(configs["associations_exclude"] || [], T::Array[String])
+      @parallel = T.let(configs.key?("parallel") ? configs["parallel"] : true, T::Boolean)
+      @cache_enabled = T.let(configs.key?("cache") ? configs["cache"] : false, T::Boolean)
+      @cache_directory = T.let(Pathname.new(configs["cache_directory"] || "tmp/cache/packwerk"), Pathname)
       @config_path = config_path
 
-      if configs["load_paths"]
-        warning = <<~WARNING
-          DEPRECATION WARNING: The 'load_paths' key in `packwerk.yml` is deprecated.
-          This value is no longer cached, and you can remove the key from `packwerk.yml`.
-        WARNING
+      @offenses_formatter_identifier = T.let(
+        configs["offenses_formatter"] || Formatters::DefaultOffensesFormatter::IDENTIFIER, String
+      )
 
-        warn(warning)
-      end
-
-      if configs["inflections_file"]
-        warning = <<~WARNING
-          DEPRECATION WARNING: The 'inflections_file' key in `packwerk.yml` is deprecated.
-          This value is no longer cached, and you can remove the key from `packwerk.yml`.
-          You can also delete #{configs["inflections_file"]}.
-        WARNING
-
-        warn(warning)
-      end
-
-      inflection_file = File.expand_path(configs["inflections_file"] || "config/inflections.yml", @root_path)
-      if Pathname.new(inflection_file).exist?
-        warning = <<~WARNING
-          DEPRECATION WARNING: Inflections YMLs in packwerk are now deprecated.
-          This value is no longer cached, and you can now delete #{inflection_file}
-        WARNING
-
-        warn(warning)
+      if configs.key?("require")
+        configs["require"].each do |require_directive|
+          ExtensionLoader.load(require_directive, @root_path)
+        end
       end
     end
 
+    sig { returns(T::Hash[String, Module]) }
     def load_paths
-      @load_paths ||= ApplicationLoadPaths.extract_relevant_paths(@root_path, "test")
+      @load_paths ||= T.let(
+        RailsLoadPaths.for(@root_path, environment: "test"),
+        T.nilable(T::Hash[String, Module]),
+      )
     end
 
+    sig { returns(T::Boolean) }
     def parallel?
       @parallel
     end
 
+    sig { returns(OffensesFormatter) }
+    def offenses_formatter
+      OffensesFormatter.find(@offenses_formatter_identifier)
+    end
+
+    sig { returns(T::Boolean) }
     def cache_enabled?
       @cache_enabled
     end

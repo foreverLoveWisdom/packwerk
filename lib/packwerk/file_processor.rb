@@ -1,7 +1,7 @@
 # typed: strict
 # frozen_string_literal: true
 
-require "ast/node"
+require "parser/ast/node"
 
 module Packwerk
   class FileProcessor
@@ -53,6 +53,17 @@ module Packwerk
       ProcessedFile.new(unresolved_references: unresolved_references)
     rescue Parsers::ParseError => e
       ProcessedFile.new(offenses: [e.result])
+    rescue StandardError => e
+      message = <<~MSG
+        Packwerk encountered an internal error.
+        For now, you can add this file to `packwerk.yml` `exclude` list.
+        Please file an issue and include this error message and stacktrace:
+
+        #{e.message} #{e.backtrace&.join("\n")}"
+      MSG
+
+      offense = Parsers::ParseResult.new(file: relative_file, message: message)
+      ProcessedFile.new(offenses: [offense])
     end
 
     private
@@ -64,7 +75,7 @@ module Packwerk
       references = []
 
       node_processor = @node_processor_factory.for(relative_file: relative_file, node: node)
-      node_visitor = Packwerk::NodeVisitor.new(node_processor: node_processor)
+      node_visitor = NodeVisitor.new(node_processor: node_processor)
       node_visitor.visit(node, ancestors: [], result: references)
 
       references
@@ -82,4 +93,6 @@ module Packwerk
       @parser_factory.for_path(file_path)
     end
   end
+
+  private_constant :FileProcessor
 end

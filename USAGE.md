@@ -13,12 +13,14 @@
 * [Defining packages](#defining-packages)
   * [Package metadata](#package-metadata)
 * [Types of boundary checks](#types-of-boundary-checks)
-  * [Enforcing privacy boundary](#enforcing-privacy-boundary)
-    * [Using public folders](#using-public-folders)
   * [Enforcing dependency boundary](#enforcing-dependency-boundary)
+* [Using strict mode](#using-strict-mode)
 * [Checking for violations](#checking-for-violations)
+* [Resolving new violations](#resolving-new-violations)
+  * [Understanding how to respond to new violations](#understanding-how-to-respond-to-new-violations)
 * [Recording existing violations](#recording-existing-violations)
-  * [Understanding the list of deprecated references](#understanding-the-list-of-deprecated-references)
+  * [Understanding the package todo file](#understanding-the-package-todo-file)
+* [Loading extensions](#loading-extensions)
 
 ## What problem does Packwerk solve?
 
@@ -39,7 +41,7 @@ A package is a folder containing autoloaded code. To decide whether code belongs
 
 Package principles help to guide the organization of classes in a large system. These principles can also be applied to packages in large and complex codebases.
 
-The [package principles](https://en.wikipedia.org/wiki/Package_principles) page on Wikipedia does a good job explaining what well designed packages look like.
+They are well described in Robert Martin's [Design Principles and Design Patterns](https://web.archive.org/web/20150906155800/http://www.objectmentor.com/resources/articles/Principles_and_Patterns.pdf) (right after the SOLID principles).
 
 ## Getting started
 
@@ -54,7 +56,7 @@ Here is a list of files generated:
 
 | File                        | Location     | Description |
 |-----------------------------|--------------|------------|
-| Packwerk configuration      | packwerk.yml | See [Setting up the configuration file](#Setting-up-the-configuration-file) |
+| Packwerk configuration      | packwerk.yml | See [Setting up the configuration file](#configuring-packwerk) |
 | Root package                | package.yml  | A package for the root folder |
 
 After that, you may begin creating packages for your application. See [Defining packages](#Defining-packages)
@@ -74,6 +76,7 @@ Packwerk reads from the `packwerk.yml` configuration file in the root directory.
 |----------------------|-------------------------------------------|--------------|
 | include              | **/*.{rb,rake,erb}                        | list of patterns for folder paths to include |
 | exclude              | {bin,node_modules,script,tmp,vendor}/**/* | list of patterns for folder paths to exclude |
+| associations_exclude | N/A                                       | list of patterns for folder paths to exclude from association inspection |
 | package_paths        | **/                                       | a single pattern or a list of patterns to find package configuration files, see: [Defining packages](#Defining-packages) |
 | custom_associations  | N/A                                       | list of custom associations, if any |
 | parallel             | true                                      | when true, fork code parsing out to subprocesses |
@@ -141,50 +144,10 @@ Example:
 
 ## Types of boundary checks
 
-Packwerk can perform two types of boundary checks: privacy and dependency.
-
-#### Enforcing privacy boundary
-
-A package's privacy boundary is violated when there is a reference to the package's private constants from a source outside the package.
-
-There are two ways you can enforce privacy for your package:
-
-1. Enforce privacy for all external sources
-
-```yaml
-# components/merchandising/package.yml
-enforce_privacy: true  # will make everything private that is not in
-                        # the components/merchandising/app/public folder
-```
-
-Setting `enforce_privacy` to true will make all references to private constants in your package a violation.
-
-2. Enforce privacy for specific constants
-
-```yaml
-# components/merchandising/package.yml
-enforce_privacy:
-  - "::Merchandising::Product"
-  - "::SomeNamespace"  # enforces privacy for the namespace and
-                       # everything nested in it
-```
-
-It will be a privacy violation when a file outside of the `components/merchandising` package tries to reference `Merchandising::Product`.
-
-##### Using public folders
-You may enforce privacy either way mentioned above and still expose a public API for your package by placing constants in the public folder, which by default is `app/public`. The constants in the public folder will be made available for use by the rest of the application.
-
-##### Defining your own public folder
-
-You may prefer to override the default public folder, you can do so on a per-package basis by defining a `public_path`.
-
-Example:
-
-```yaml
-public_path: my/custom/path/
-```
+Packwerk ships with dependency boundary checking only. Other checking support may be added by extension gems.
 
 #### Enforcing dependency boundary
+
 A package's dependency boundary is violated whenever it references a constant in some package that has not been declared as a dependency.
 
 Specify `enforce_dependencies: true` to start enforcing the dependencies of a package. The intentional dependencies of the package are specified as a list under a `dependencies:` key.
@@ -199,6 +162,17 @@ dependencies:
 ```
 
 It will be a dependency violation when `components/shop_identity` tries to reference a constant that is not within `components/platform` or itself.
+
+#### Using strict mode
+
+You can turn on `strict` mode to prevent new violations from being added to the package's `package_todo.yml`. To use this, simply change `enforce_dependencies: true` to `enforce_dependencies: strict` in your `package.yml`.
+
+Then, when you run `bin/packwerk check`, new violations will cause the following error to be displayed:
+```
+packs/referencing_package cannot have dependency violations on packs/defining_package because strict mode is enabled for dependency violations in packs/referencing_package/package.yml
+```
+
+Once the `strict` mode is enabled on a package, running `bin/packwerk update-todo` will not add new violations in the package_todo.yml file and the command will return an error.
 
 ## Checking for violations
 
@@ -216,38 +190,43 @@ You can also specify packages for a shorter run time. When checking against pack
 
     bin/packwerk check --packages=components/your_package,components/your_other_package
 
+Using the following command line option you can also enable or disable parallel processing. It is enabled by default.
+
+    bin/packwerk check --[no-]parallel
+
 ![](static/packwerk_check.gif)
 
 In order to keep the package system valid at each version of the application, we recommend running `bin/packwerk check` in your CI pipeline.
 
 See: [TROUBLESHOOT.md - Sample violations](TROUBLESHOOT.md#Sample-violations)
 
+## Resolving new violations
+
+### Understanding how to respond to new violations
+
+When you have a new dependency violation, what do you do?
+
+See: [RESOLVING_VIOLATIONS.md](RESOLVING_VIOLATIONS.md)
+
 ## Recording existing violations
 
 For existing codebases, packages are likely to have existing boundary violations.
 
-If so, you will want to stop the bleeding and prevent more violations from occuring. The existing violations in the codebase can be recorded in a [deprecated references list](#Understanding_the_list_of_deprecated_references) by executing:
+If so, you will want to stop the bleeding and prevent more violations from occuring. The existing violations in the codebase can be recorded in a [todo list](#understanding-the-package-todo-file) by executing:
 
-    bin/packwerk update-deprecations
-
-Similar to `bin/packwerk check`, you may also run `bin/packwerk update-deprecations` on folders or packages:
-
-    bin/packwerk update-deprecations components/your_package
+    bin/packwerk update-todo
 
 ![](static/packwerk_update.gif)
 
-_Note: Changing dependencies or enabling dependencies will not require a full update of the codebase, only the package that changed. On the other hand, changing or enabling privacy will require a full update of the codebase._
-
-`bin/packwerk update-deprecations` should only be run to record existing violations and to remove deprecated references that have been worked off. Running `bin/packwerk update-deprecations` to resolve a violation should be the very last resort.
+`bin/packwerk update-todo` should only be run to record existing violations and to remove violations that have been worked off. Running `bin/packwerk update-todo` to resolve a violation should be the very last resort.
 
 See: [TROUBLESHOOT.md - Troubleshooting violations](TROUBLESHOOT.md#Troubleshooting_violations)
 
+### Understanding the package todo file
 
-### Understanding the list of deprecated references
+The package TODO list is called `package_todo.yml` and can be found in the package folder. The list outlines the constant violations of the package, where the violation is located, and the file defining the violation.
 
-The deprecated references list is called `deprecated_references.yml` and can be found in the package folder. The list outlines the constant violations of the package, where the violation is located, and the file defining the violation.
-
-The deprecated references list should not be added to, but worked off over time.
+The package TODO list should not be added to, but worked off over time.
 
 ```yaml
 components/merchant:
@@ -258,11 +237,129 @@ components/merchant:
     - components/merchant/app/public/merchant/generate_order.rb
 ```
 
-Above is an example of a constant violation entry in `deprecated_references.yml`.
+Above is an example of a constant violation entry in `package_todo.yml`.
 
 * `components/merchant` - package where the constant violation is found
 * `::Checkouts::Core::CheckoutId` - violated constant in question
-* `dependency` - type of violation, either dependency or privacy
+* `dependency` - type of violation, typically dependency
 * `components/merchant/app/public/merchant/generate_order.rb` - path to the file containing the violated constant
 
-Violations exist within the package that makes a violating reference. This means privacy violations of your package can be found listed in `deprecated_references.yml` files in the packages with the reference to a private constant.
+Violations exist within the package that makes a violating reference.
+
+# Loading Extensions
+
+You can optionally specify ruby files that you'd like to be loaded with `packwerk` by specifying a `require` directive in `packwerk.yml`:
+```yml
+require:
+  - ./path/to/file.rb
+  - my_gem
+```
+
+`packwerk` will directly call `require` with these paths.
+You can prefix local files with a dot to define them relative to `packwerk.yml`, or you can use absolute paths.
+You can also reference the name of a gem.
+
+## Examples
+
+### Custom Offense Formatter
+
+While `packwerk` ships with its own offense formatter, you may specify a custom one in your configuration file via the `offenses_formatter:` key.  Your custom formatter will be used when `bin/packwerk check` is run.
+
+Firstly, you'll need to create an `OffensesFormatter` class that includes `Packwerk::OffensesFormatter`. You can use [`Packwerk::Formatters::DefaultOffensesFormatter`](lib/packwerk/formatters/default_offenses_formatter.rb) as a point of reference for this. Then, in the `require` directive described above, you'll want to tell `packwerk` about it:
+```ruby
+# ./path/to/file.rb
+class MyOffensesFormatter
+  include Packwerk::OffensesFormatter
+  # implement the `OffensesFormatter` interface
+
+  def identifier
+    'my_offenses_formatter'
+  end
+end
+```
+
+Then in `packwerk.yml`, you can set the `formatter` to the identifier for your class:
+```yml
+offenses_formatter: my_offenses_formatter
+```
+
+You can also pass in a formatter on the command line:
+```
+bin/packwerk check --offenses-formatter=my_offenses_formatter
+```
+
+### Custom Checkers
+
+Packwerk ships with a way to analyze dependencies and also supports custom checkers from extension gems.
+
+Custom checkers will allow references to constants to be analyzed in new ways, and for those invalid references to show up as violations in `package_todo.yml`.
+
+To create a custom checker, you'll first need to create a checker class that includes `Packwerk::Checker`. You can use [`Packwerk::ReferenceChecking::Checkers::DependencyChecker`](lib/packwerk/reference_checking/checkers/dependency_checker.rb) as a point of reference for this. Here is an example:
+
+```ruby
+# ./path/to/file.rb
+class MyChecker
+  include Packwerk::Checker
+  # implement the `Checker` interface
+
+  sig { override.returns(String) }
+  def violation_type
+    'my_custom_violation_type'
+  end
+
+  sig { override.params(listed_offense: ReferenceOffense).returns(T::Boolean) }
+  def strict_mode_violation?(listed_offense)
+    # This will allow "strict mode" to be supported in your checker
+    referencing_package = listed_offense.reference.package
+    referencing_package.config["enforce_custom"] == "strict"
+  end
+
+  sig { override.params(reference: Reference).returns(T::Boolean) }
+  def invalid_reference?(reference)
+    # your logic here
+  end
+
+  sig { override.params(reference: Reference).returns(String) }
+  def message(reference)
+    # your message here
+  end
+end
+```
+
+Then, in the `require` directive described above, you'll want to tell `packwerk` about it:
+
+```yml
+require:
+  - ./path/to/file.rb
+```
+
+### Custom Validators
+
+Similar to checkers, you can define your own validator to be executed when `bin/packwerk validate` is invoked. This can be used to support your custom checker (by specifying permitted keys) or to provide any other validations you want to impose on packages.
+
+To create a custom validator, you'll first need to create a validator class that includes `Packwerk::Validator`. You can use [`Packwerk::Validators::DependencyValidator`](lib/packwerk/validators/dependency_validator.rb) as a point of reference for this. Here is an example:
+
+```ruby
+# ./path/to/file.rb
+class MyValidator
+  include Packwerk::Validator
+  # implement the `Validator` interface
+
+  sig { override.returns(T::Array[String]) }
+  def permitted_keys
+    ['enforce_my_custom_checker']
+  end
+
+  sig { override.params(package_set: PackageSet, configuration: Configuration).returns(ApplicationValidator::Result) }
+  def call(package_set, configuration)
+    # your logic here
+  end
+end
+```
+
+Then, in the `require` directive described above, you'll want to tell `packwerk` about it:
+
+```yml
+require:
+  - ./path/to/file.rb
+```

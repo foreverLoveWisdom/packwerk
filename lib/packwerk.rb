@@ -4,47 +4,35 @@
 require "sorbet-runtime"
 require "active_support"
 require "fileutils"
+require "stringio"
 
 # Provides String#pluralize
 require "active_support/core_ext/string"
+# Provides Object#to_json
+require "active_support/core_ext/object/json"
 
 module Packwerk
   extend ActiveSupport::Autoload
 
-  autoload :ApplicationLoadPaths
-  autoload :ApplicationValidator
-  autoload :AssociationInspector
-  autoload :OffenseCollection
-  autoload :Cache
+  # Public APIs
+  autoload :Checker
   autoload :Cli
   autoload :Configuration
-  autoload :ConstantDiscovery
-  autoload :ConstantNameInspector
-  autoload :ConstNodeInspector
-  autoload :DeprecatedReferences
-  autoload :FileProcessor
-  autoload :FilesForProcessing
-  autoload :Graph
+  autoload :ConstantContext
+  autoload :Commands
   autoload :Node
-  autoload :NodeProcessor
-  autoload :NodeProcessorFactory
-  autoload :NodeVisitor
   autoload :Offense
+  autoload :OffenseCollection
   autoload :OffensesFormatter
   autoload :OutputStyle
   autoload :Package
   autoload :PackageSet
-  autoload :ParsedConstantDefinitions
+  autoload :PackageTodo
   autoload :Parsers
-  autoload :ParseRun
-  autoload :UnresolvedReference
+  autoload :RailsLoadPaths
   autoload :Reference
-  autoload :ReferenceExtractor
   autoload :ReferenceOffense
-  autoload :Result
-  autoload :RunContext
-  autoload :Version
-  autoload :ViolationType
+  autoload :Validator
 
   module OutputStyles
     extend ActiveSupport::Autoload
@@ -53,16 +41,40 @@ module Packwerk
     autoload :Plain
   end
 
-  autoload_under "commands" do
-    autoload :OffenseProgressMarker
-  end
-
   module Formatters
     extend ActiveSupport::Autoload
 
-    autoload :OffensesFormatter
+    autoload :DefaultOffensesFormatter
     autoload :ProgressFormatter
   end
+
+  module Validators
+    extend ActiveSupport::Autoload
+
+    autoload :DependencyValidator
+  end
+
+  # Private APIs
+  # Please submit an issue if you have a use-case for these
+  autoload :ApplicationValidator
+  autoload :AssociationInspector
+  autoload :Cache
+  autoload :ConstantDiscovery
+  autoload :ConstantNameInspector
+  autoload :ConstNodeInspector
+  autoload :ExtensionLoader
+  autoload :FileProcessor
+  autoload :FilesForProcessing
+  autoload :Graph
+  autoload :NodeHelpers
+  autoload :NodeProcessor
+  autoload :NodeProcessorFactory
+  autoload :NodeVisitor
+  autoload :ParsedConstantDefinitions
+  autoload :ParseRun
+  autoload :ReferenceExtractor
+  autoload :RunContext
+  autoload :UnresolvedReference
 
   module Generators
     extend ActiveSupport::Autoload
@@ -70,6 +82,8 @@ module Packwerk
     autoload :ConfigurationFile
     autoload :RootPackage
   end
+
+  private_constant :Generators
 
   module ReferenceChecking
     extend ActiveSupport::Autoload
@@ -79,9 +93,11 @@ module Packwerk
     module Checkers
       extend ActiveSupport::Autoload
 
-      autoload :Checker
       autoload :DependencyChecker
-      autoload :PrivacyChecker
     end
   end
+
+  private_constant :ReferenceChecking
 end
+
+require "packwerk/version"

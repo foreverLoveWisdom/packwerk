@@ -8,11 +8,6 @@ module Packwerk
   class RunContext
     extend T::Sig
 
-    DEFAULT_CHECKERS = T.let([
-      ::Packwerk::ReferenceChecking::Checkers::DependencyChecker.new,
-      ::Packwerk::ReferenceChecking::Checkers::PrivacyChecker.new,
-    ], T::Array[ReferenceChecking::Checkers::Checker])
-
     class << self
       extend T::Sig
 
@@ -20,14 +15,13 @@ module Packwerk
         params(configuration: Configuration).returns(RunContext)
       end
       def from_configuration(configuration)
-        inflector = ActiveSupport::Inflector
-
         new(
           root_path: configuration.root_path,
           load_paths: configuration.load_paths,
           package_paths: configuration.package_paths,
-          inflector: inflector,
+          inflector: ActiveSupport::Inflector,
           custom_associations: configuration.custom_associations,
+          associations_exclude: configuration.associations_exclude,
           cache_enabled: configuration.cache_enabled?,
           cache_directory: configuration.cache_directory,
           config_path: configuration.config_path,
@@ -44,7 +38,8 @@ module Packwerk
         config_path: T.nilable(String),
         package_paths: T.nilable(T.any(T::Array[String], String)),
         custom_associations: AssociationInspector::CustomAssociations,
-        checkers: T::Array[ReferenceChecking::Checkers::Checker],
+        associations_exclude: T::Array[String],
+        checkers: T::Array[Checker],
         cache_enabled: T::Boolean,
       ).void
     end
@@ -56,7 +51,8 @@ module Packwerk
       config_path: nil,
       package_paths: nil,
       custom_associations: [],
-      checkers: DEFAULT_CHECKERS,
+      associations_exclude: [],
+      checkers: Checker.all,
       cache_enabled: false
     )
       @root_path = root_path
@@ -64,6 +60,7 @@ module Packwerk
       @package_paths = package_paths
       @inflector = inflector
       @custom_associations = custom_associations
+      @associations_exclude = associations_exclude
       @checkers = checkers
       @cache_enabled = cache_enabled
       @cache_directory = cache_directory
@@ -71,6 +68,7 @@ module Packwerk
 
       @file_processor = T.let(nil, T.nilable(FileProcessor))
       @context_provider = T.let(nil, T.nilable(ConstantDiscovery))
+      @package_set = T.let(nil, T.nilable(PackageSet))
       # We need to initialize this before we fork the process, see https://github.com/Shopify/packwerk/issues/182
       @cache = T.let(
         Cache.new(enable_cache: @cache_enabled, cache_directory: @cache_directory, config_path: @config_path), Cache
@@ -88,6 +86,11 @@ module Packwerk
       reference_checker = ReferenceChecking::ReferenceChecker.new(@checkers)
 
       processed_file.offenses + references.flat_map { |reference| reference_checker.call(reference) }
+    end
+
+    sig { returns(PackageSet) }
+    def package_set
+      @package_set ||= ::Packwerk::PackageSet.load_all_from(@root_path, package_pathspec: @package_paths)
     end
 
     private
@@ -108,7 +111,7 @@ module Packwerk
 
     sig { returns(ConstantDiscovery) }
     def context_provider
-      @context_provider ||= ::Packwerk::ConstantDiscovery.new(
+      @context_provider ||= ConstantDiscovery.new(
         constant_resolver: resolver,
         packages: package_set
       )
@@ -123,17 +126,23 @@ module Packwerk
       )
     end
 
-    sig { returns(PackageSet) }
-    def package_set
-      ::Packwerk::PackageSet.load_all_from(@root_path, package_pathspec: @package_paths)
-    end
-
     sig { returns(T::Array[ConstantNameInspector]) }
     def constant_name_inspectors
       [
-        ::Packwerk::ConstNodeInspector.new,
-        ::Packwerk::AssociationInspector.new(inflector: @inflector, custom_associations: @custom_associations),
+        ConstNodeInspector.new,
+        AssociationInspector.new(
+          inflector: @inflector,
+          custom_associations: @custom_associations,
+          excluded_files: relative_files_for_globs(@associations_exclude),
+        ),
       ]
     end
+
+    sig { params(relative_globs: T::Array[String]).returns(FilesForProcessing::RelativeFileSet) }
+    def relative_files_for_globs(relative_globs)
+      Set.new(relative_globs.flat_map { |glob| Dir[glob] })
+    end
   end
+
+  private_constant :RunContext
 end
